@@ -1,0 +1,1 @@
+from microplastic_ftir.models.traditional import TraditionalModelWrapper
