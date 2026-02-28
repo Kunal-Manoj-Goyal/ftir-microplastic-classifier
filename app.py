@@ -4,178 +4,258 @@ import numpy as np
 import joblib
 import json
 import plotly.graph_objects as go
+from io import BytesIO
 from microplastic_ftir.preprocessing.pipeline import PreprocessingPipeline
 
-# --- PAGE CONFIG ---
+# --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title="Microplastic Classifier",
+    page_title="SpectraMind | Microplastic ID",
     page_icon="🔬",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"  # Cleaner look
 )
 
-# --- CSS FOR STYLING ---
+# --- 2. CUSTOM CSS (Modern UI) ---
 st.markdown("""
     <style>
-    .main {
-        background-color: #f8f9fa;
+    /* Main Background */
+    .stApp {
+        background-color: #0E1117;
+        color: #FAFAFA;
     }
-    .stButton>button {
-        width: 100%;
-        border-radius: 5px;
-        height: 3em;
+    
+    /* Header Styles */
+    h1 {
+        font-family: 'Helvetica Neue', sans-serif;
+        font-weight: 700;
+        color: #4facfe;
+        margin-bottom: 0px;
     }
-    .prediction-box {
-        padding: 20px;
-        border-radius: 10px;
-        background-color: #ffffff;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    h3 {
+        font-weight: 400;
+        color: #A0AEC0;
+    }
+    
+    /* Result Card */
+    .result-card {
+        background: linear-gradient(145deg, #1e212b, #242731);
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        border: 1px solid #333;
         text-align: center;
         margin-bottom: 20px;
     }
-    .metric-container {
-        display: flex;
-        justify-content: center;
-        gap: 20px;
+    
+    .polymer-name {
+        font-size: 3.5rem;
+        font-weight: 800;
+        background: -webkit-linear-gradient(45deg, #4facfe, #00f2fe);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 10px 0;
+    }
+    
+    .confidence-badge {
+        background-color: #2E86C1;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    
+    /* Custom File Uploader Style */
+    .stFileUploader {
+        border: 2px dashed #4facfe;
+        border-radius: 10px;
+        padding: 20px;
+    }
+    
+    /* Button Style */
+    .stButton>button {
+        background-color: #2E3B55;
+        color: white;
+        border: 1px solid #4facfe;
+        border-radius: 8px;
+    }
+    .stButton>button:hover {
+        background-color: #4facfe;
+        border-color: #00f2fe;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- LOAD RESOURCES ---
+# --- 3. HELPER FUNCTIONS ---
 @st.cache_resource
 def load_resources():
-    model = joblib.load('model.pkl')
-    
-    with open('preprocessing_config.json') as f:
-        pp_config = json.load(f)
-    pipeline = PreprocessingPipeline.from_dict(pp_config)
-    
-    with open('label_decoder.json') as f:
-        decoder = json.load(f)
-        # Convert keys to int
-        decoder = {int(k): v for k, v in decoder.items()}
-        
-    return model, pipeline, decoder
+    try:
+        model = joblib.load('model.pkl')
+        with open('preprocessing_config.json') as f:
+            pp_config = json.load(f)
+        pipeline = PreprocessingPipeline.from_dict(pp_config)
+        with open('label_decoder.json') as f:
+            decoder = json.load(f)
+            decoder = {int(k): v for k, v in decoder.items()}
+        return model, pipeline, decoder
+    except FileNotFoundError:
+        st.error("❌ Model files not found. Please ensure 'model.pkl' and configs are in the root directory.")
+        st.stop()
 
-try:
-    model, pipeline, label_decoder = load_resources()
-except Exception as e:
-    st.error(f"Failed to load resources: {e}")
-    st.stop()
+def to_csv(df):
+    output = BytesIO()
+    df.to_csv(output, index=False)
+    return output.getvalue()
 
-# --- SIDEBAR ---
-with st.sidebar:
-    st.image("https://img.icons8.com/color/96/000000/microscope.png", width=80)
-    st.title("Settings")
-    st.info("This tool identifies microplastic polymers from FTIR spectra using a machine learning model trained on ~6000 samples.")
-    
-    show_raw = st.checkbox("Show Raw Spectrum", value=True)
-    show_proc = st.checkbox("Show Processed Spectrum", value=True)
-    
-    st.markdown("---")
-    st.markdown("Created by **Your Name**")
-    st.markdown("Powered by **Streamlit & LightGBM**")
+# --- 4. APP LOGIC ---
+model, pipeline, label_decoder = load_resources()
 
-# --- MAIN CONTENT ---
-st.title("🔬 Microplastic FTIR Identification")
-st.markdown("Upload a CSV or TXT file containing spectral data (Wavenumber, Intensity).")
+# -- Hero Section --
+col_logo, col_title = st.columns([1, 6])
+with col_logo:
+    st.image("https://img.icons8.com/fluency/96/000000/microscope.png", width=80)
+with col_title:
+    st.title("SpectraMind")
+    st.caption("Advanced AI for Microplastic Identification")
 
-uploaded_file = st.file_uploader(" ", type=['csv', 'txt'])
+st.markdown("---")
+
+# -- Layout --
+col_upload, col_result = st.columns([1, 2])
+
+with col_upload:
+    st.markdown("### 1. Upload Spectrum")
+    st.info("Supported formats: CSV, TXT (2 columns: Wavenumber, Intensity)")
+    uploaded_file = st.file_uploader("Drop your spectral file here", type=['csv', 'txt'], label_visibility="collapsed")
 
 if uploaded_file:
     try:
-        # 1. READ DATA
-        # Try different delimiters
+        # Data Loading logic (Robust)
         try:
             df = pd.read_csv(uploaded_file, header=None)
             if df.shape[1] < 2:
                 uploaded_file.seek(0)
                 df = pd.read_csv(uploaded_file, header=None, sep=r'\s+')
         except:
-            st.error("Could not read file. Ensure it is CSV or Space-delimited.")
+            st.error("Error reading file format.")
             st.stop()
-            
-        wn = df.iloc[:, 0].values
-        intensity = df.iloc[:, 1].values
-        
-        # 2. STANDARDIZE
+
+        wn_raw = df.iloc[:, 0].values
+        int_raw = df.iloc[:, 1].values
+
+        # Standardize (Interpolate to 1800 pts)
         target_wn = np.linspace(400, 4000, 1800)
-        if wn[0] > wn[-1]: 
-            wn = wn[::-1]
-            intensity = intensity[::-1]
+        # Handle descending/ascending raw data
+        if wn_raw[0] > wn_raw[-1]:
+            wn_sorted = wn_raw[::-1]
+            int_sorted = int_raw[::-1]
+        else:
+            wn_sorted = wn_raw
+            int_sorted = int_raw
             
-        intensity_interp = np.interp(target_wn, wn, intensity)
-        
-        # 3. PREPROCESS & PREDICT
+        intensity_interp = np.interp(target_wn, wn_sorted, int_sorted)
+
+        # Preprocess
         X = intensity_interp.reshape(1, -1)
-        X_pp = pipeline.transform(X)
-        
+        X_pp = pipeline.transform(X) # This is the "Processed" data (Derivative/SNV)
+
+        # Predict
         probs = model.predict_proba(X_pp)[0]
         pred_idx = np.argmax(probs)
         pred_name = label_decoder.get(pred_idx, "Unknown")
         confidence = probs[pred_idx]
-        
-        # --- RESULTS SECTION ---
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
+
+        # --- RESULTS COLUMN ---
+        with col_result:
+            st.markdown("### 2. Analysis Result")
+            
+            # The "Card"
             st.markdown(f"""
-                <div class="prediction-box">
-                    <h3 style='margin:0; color:#555;'>Identified Polymer</h3>
-                    <h1 style='font-size: 3em; color:#2E86C1; margin:10px 0;'>{pred_name}</h1>
-                    <p style='color:#777; font-size:1.1em;'>Confidence: <b>{confidence:.1%}</b></p>
+                <div class="result-card">
+                    <h3 style="margin-bottom:0;">Identified Polymer</h3>
+                    <div class="polymer-name">{pred_name}</div>
+                    <span class="confidence-badge">Confidence: {confidence:.1%}</span>
                 </div>
             """, unsafe_allow_html=True)
-            
-            # Probability Bar Chart
-            st.caption("Class Probabilities")
-            chart_data = pd.DataFrame({
-                "Polymer": [label_decoder[i] for i in range(len(probs))],
-                "Probability": probs
-            }).sort_values("Probability", ascending=False).head(5)
-            
-            st.bar_chart(chart_data.set_index("Polymer"))
 
-        with col2:
-            # Interactive Spectral Plot (Plotly)
-            fig = go.Figure()
-            
-            if show_raw:
-                fig.add_trace(go.Scatter(
-                    x=target_wn, y=intensity_interp, 
-                    name='Raw Spectrum', 
-                    line=dict(color='#888', width=1.5),
-                    opacity=0.6
-                ))
-                
-            if show_proc:
-                # Scale processed to match raw range for visualization overlay?
-                # No, better to use secondary y-axis to fix the "flat line" issue
-                fig.add_trace(go.Scatter(
-                    x=target_wn, y=X_pp[0], 
-                    name='Processed (2nd Axis)', 
-                    line=dict(color='#2E86C1', width=2),
-                    yaxis='y2'
-                ))
+            # Probabilities Chart (Plotly for interactivity)
+            top_n = 5
+            top_indices = np.argsort(probs)[::-1][:top_n]
+            top_probs = probs[top_indices]
+            top_names = [label_decoder.get(i, f"Class {i}") for i in top_indices]
 
-            fig.update_layout(
-                title="Spectral Analysis",
-                xaxis_title="Wavenumber (cm⁻¹)",
-                yaxis_title="Raw Intensity",
-                yaxis2=dict(
-                    title="Processed Intensity",
-                    overlaying='y',
-                    side='right',
-                    showgrid=False
-                ),
-                xaxis=dict(autorange="reversed"), # Standard FTIR view
-                legend=dict(x=0, y=1),
-                margin=dict(l=0, r=0, t=40, b=0),
-                height=500
+            fig_bar = go.Figure(go.Bar(
+                x=top_probs,
+                y=top_names,
+                orientation='h',
+                marker=dict(color=top_probs, colorscale='Blues')
+            ))
+            fig_bar.update_layout(
+                title="Top Matches",
+                xaxis_title="Probability",
+                yaxis=dict(autorange="reversed"),
+                height=250,
+                margin=dict(l=0, r=0, t=30, b=0),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#FAFAFA')
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig_bar, use_container_width=True)
 
     except Exception as e:
-        st.error(f"Error processing spectrum: {e}")
-        import traceback
-        st.code(traceback.format_exc())
+        st.error(f"Processing Error: {e}")
+        st.stop()
+
+# --- FULL WIDTH PLOT SECTION ---
+if uploaded_file:
+    st.markdown("---")
+    st.markdown("### 3. Spectral Visualization")
+    
+    # Create clean dataframe for export
+    export_df = pd.DataFrame({
+        "Wavenumber": target_wn,
+        "Processed_Intensity": X_pp[0]
+    })
+
+    col_chart, col_download = st.columns([5, 1])
+    
+    with col_download:
+        st.write("") # Spacer
+        st.markdown("**Export Data**")
+        st.download_button(
+            label="Download .CSV",
+            data=to_csv(export_df),
+            file_name=f"{pred_name}_processed_spectrum.csv",
+            mime="text/csv",
+            help="Download the preprocessed spectral data used for prediction."
+        )
+
+    with col_chart:
+        # Main Spectral Plot
+        fig_spec = go.Figure()
+        
+        # Plot only the PROCESSED data (clean signal)
+        fig_spec.add_trace(go.Scatter(
+            x=target_wn, 
+            y=X_pp[0], 
+            mode='lines',
+            name='Processed Spectrum',
+            line=dict(color='#00f2fe', width=2),
+            fill='tozeroy',  # Nice area fill effect
+            fillcolor='rgba(0, 242, 254, 0.1)'
+        ))
+
+        fig_spec.update_layout(
+            title="Processed Signal (Derivative/SNV)",
+            xaxis_title="Wavenumber (cm⁻¹)",
+            yaxis_title="Normalized Intensity",
+            xaxis=dict(autorange="reversed", gridcolor='#333'), # FTIR standard reverse X
+            yaxis=dict(gridcolor='#333'),
+            height=500,
+            hovermode="x unified",
+            paper_bgcolor='#0E1117',
+            plot_bgcolor='#161b24',
+            font=dict(color='#FAFAFA'),
+            margin=dict(l=0, r=0, t=40, b=0)
+        )
+        st.plotly_chart(fig_spec, use_container_width=True)
