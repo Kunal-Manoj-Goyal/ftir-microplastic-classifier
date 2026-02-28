@@ -297,53 +297,6 @@ st.markdown("""
         margin-top: 10px;
     }
     
-    /* Download Button Custom */
-    .download-btn {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 12px 24px;
-        border-radius: 12px;
-        border: none;
-        font-weight: 600;
-        font-size: 0.9rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        text-decoration: none;
-    }
-    
-    .download-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.35);
-    }
-    
-    /* Streamlit Overrides */
-    .stFileUploader > div > div {
-        background: transparent !important;
-        border: none !important;
-    }
-    
-    .stFileUploader label {
-        display: none;
-    }
-    
-    .stDownloadButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 12px !important;
-        padding: 12px 28px !important;
-        font-weight: 600 !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    .stDownloadButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.35) !important;
-    }
-    
     /* Info Box */
     .info-box {
         background: rgba(102, 126, 234, 0.1);
@@ -382,48 +335,41 @@ st.markdown("""
         animation: fadeInUp 0.6s ease-out forwards;
     }
     
-    /* Probability Pills */
-    .prob-container {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 15px;
+    /* Streamlit Overrides */
+    .stFileUploader > div > div {
+        background: transparent !important;
+        border: none !important;
     }
     
-    .prob-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
+    .stFileUploader label {
+        display: none;
     }
     
-    .prob-name {
-        color: #ffffff;
-        font-size: 0.9rem;
-        font-weight: 500;
-        min-width: 100px;
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 12px 28px !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
     }
     
-    .prob-bar-container {
-        flex: 1;
-        background: rgba(102, 126, 234, 0.1);
-        border-radius: 6px;
-        height: 8px;
-        overflow: hidden;
+    .stDownloadButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.35) !important;
     }
     
-    .prob-bar {
-        height: 100%;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        border-radius: 6px;
-    }
-    
-    .prob-value {
-        color: #667eea;
+    /* Footer */
+    .footer-text {
+        text-align: center;
+        padding: 40px 0 20px 0;
+        color: #4a5568;
         font-size: 0.85rem;
-        font-weight: 600;
-        font-family: 'JetBrains Mono', monospace;
-        min-width: 50px;
-        text-align: right;
+    }
+    
+    .footer-text span {
+        color: #667eea;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -495,6 +441,7 @@ with col_upload:
 pred_name = None
 target_wn = None
 X_pp = None
+wn_raw = None
 
 if uploaded_file:
     try:
@@ -543,46 +490,40 @@ if uploaded_file:
                 </div>
             """, unsafe_allow_html=True)
             
-            # Result Card
+            # Result Card - Using Streamlit columns for stats to ensure rendering
             st.markdown(f"""
                 <div class="result-card animate-in">
                     <p class="result-label">Identified Polymer</p>
                     <h2 class="polymer-name">{pred_name}</h2>
-                    
                     <div class="confidence-container">
                         <span class="confidence-value">{confidence:.1%}</span>
                         <span class="confidence-label"> confidence</span>
                         <div class="confidence-bar-bg">
-                            <div class="confidence-bar-fill" style="width: {confidence*100}%;"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <div class="stat-value">{len(wn_raw)}</div>
-                            <div class="stat-label">Data Points</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">{wn_raw.min():.0f}-{wn_raw.max():.0f}</div>
-                            <div class="stat-label">Range (cm⁻¹)</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-value">{len(label_decoder)}</div>
-                            <div class="stat-label">Polymers DB</div>
+                            <div class="confidence-bar-fill" style="width: {confidence*100:.1f}%;"></div>
                         </div>
                     </div>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # Stats using Streamlit native components for reliability
+            st.markdown("<br>", unsafe_allow_html=True)
+            stat_col1, stat_col2, stat_col3 = st.columns(3)
+            with stat_col1:
+                st.metric("Data Points", f"{len(wn_raw):,}")
+            with stat_col2:
+                st.metric("Range (cm⁻¹)", f"{wn_raw.min():.0f}-{wn_raw.max():.0f}")
+            with stat_col3:
+                st.metric("Polymers DB", len(label_decoder))
+
+            st.markdown("<br>", unsafe_allow_html=True)
 
             # Top Matches Section
-            st.markdown("<br>", unsafe_allow_html=True)
-            
             top_n = 5
             top_indices = np.argsort(probs)[::-1][:top_n]
             top_probs = probs[top_indices]
             top_names = [label_decoder.get(i, f"Class {i}") for i in top_indices]
 
-            # Plotly Chart with enhanced styling
+            # Plotly Chart with FIXED syntax
             colors = ['#667eea', '#764ba2', '#f093fb', '#a855f7', '#6366f1']
             
             fig_bar = go.Figure(go.Bar(
@@ -606,8 +547,7 @@ if uploaded_file:
                     x=0
                 ),
                 xaxis=dict(
-                    title="Probability",
-                    titlefont=dict(color='#a0aec0', size=12),
+                    title=dict(text="Probability", font=dict(color='#a0aec0', size=12)),
                     tickfont=dict(color='#a0aec0', size=10),
                     gridcolor='rgba(102, 126, 234, 0.1)',
                     tickformat='.0%',
@@ -626,9 +566,7 @@ if uploaded_file:
                 showlegend=False
             )
             
-            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
             st.plotly_chart(fig_bar, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"⚠️ Processing Error: {e}")
@@ -661,7 +599,7 @@ if uploaded_file and pred_name and target_wn is not None and X_pp is not None:
             help="Download the preprocessed spectral data"
         )
 
-    # Main Spectral Plot
+    # Main Spectral Plot with FIXED syntax
     fig_spec = go.Figure()
     
     fig_spec.add_trace(go.Scatter(
@@ -675,7 +613,6 @@ if uploaded_file and pred_name and target_wn is not None and X_pp is not None:
         hovertemplate='<b>Wavenumber:</b> %{x:.1f} cm⁻¹<br><b>Intensity:</b> %{y:.4f}<extra></extra>'
     ))
     
-    # Add gradient effect with additional traces
     fig_spec.add_trace(go.Scatter(
         x=target_wn,
         y=X_pp[0],
@@ -693,8 +630,7 @@ if uploaded_file and pred_name and target_wn is not None and X_pp is not None:
             x=0
         ),
         xaxis=dict(
-            title="Wavenumber (cm⁻¹)",
-            titlefont=dict(color='#a0aec0', size=13, family='Inter'),
+            title=dict(text="Wavenumber (cm⁻¹)", font=dict(color='#a0aec0', size=13, family='Inter')),
             tickfont=dict(color='#a0aec0', size=11),
             autorange="reversed",
             gridcolor='rgba(102, 126, 234, 0.1)',
@@ -706,8 +642,7 @@ if uploaded_file and pred_name and target_wn is not None and X_pp is not None:
             spikedash='dot'
         ),
         yaxis=dict(
-            title="Normalized Intensity",
-            titlefont=dict(color='#a0aec0', size=13, family='Inter'),
+            title=dict(text="Normalized Intensity", font=dict(color='#a0aec0', size=13, family='Inter')),
             tickfont=dict(color='#a0aec0', size=11),
             gridcolor='rgba(102, 126, 234, 0.1)',
             linecolor='rgba(102, 126, 234, 0.3)',
@@ -741,16 +676,12 @@ if uploaded_file and pred_name and target_wn is not None and X_pp is not None:
         )
     )
     
-    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.plotly_chart(fig_spec, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer
 st.markdown("""
-    <div style="text-align: center; padding: 40px 0 20px 0; color: #4a5568;">
-        <p style="font-size: 0.85rem;">
-            Built with 💜 using Streamlit & Machine Learning<br>
-            <span style="color: #667eea;">SpectraMind</span> © 2026
-        </p>
+    <div class="footer-text">
+        <p>Built with 💜 using Streamlit & Machine Learning<br>
+        <span>SpectraMind</span> © 2026</p>
     </div>
 """, unsafe_allow_html=True)
