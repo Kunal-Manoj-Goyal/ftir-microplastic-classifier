@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import pickle
+import joblib
 import json
 import matplotlib.pyplot as plt
 from microplastic_ftir.preprocessing.pipeline import PreprocessingPipeline
@@ -14,8 +14,8 @@ with open('preprocessing_config.json') as f:
 # Load Model
 @st.cache_resource
 def load_model():
-    with open('model.pkl', 'rb') as f:
-        return pickle.load(f)
+    # joblib.load takes the filename directly, not the file object
+    return joblib.load('model.pkl')
 
 model = load_model()
 pipeline = PreprocessingPipeline.from_dict(pp_config)
