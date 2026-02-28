@@ -750,7 +750,7 @@ st.markdown("""
     <div style="text-align: center; padding: 40px 0 20px 0; color: #4a5568;">
         <p style="font-size: 0.85rem;">
             Built with 💜 using Streamlit & Machine Learning<br>
-            <span style="color: #667eea;">SpectraMind</span> © 2024
+            <span style="color: #667eea;">SpectraMind</span> © 2026
         </p>
     </div>
 """, unsafe_allow_html=True)
