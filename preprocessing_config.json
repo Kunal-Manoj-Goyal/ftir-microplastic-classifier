@@ -1,0 +1,1 @@
+{"name": "savgol11_d1_snv", "steps": ["savgol_11", "first_derivative", "snv"]}
